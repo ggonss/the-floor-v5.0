@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Floor - Gra Telewizyjna</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap');
+        body { font-family: 'Montserrat', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-6 select-none">
+
+    <!-- EKRAN 1: KONFIGURACJA -->
+    <div id="setup-screen" class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl my-auto">
+        <h1 class="text-5xl font-black text-center mb-2 bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">THE FLOOR</h1>
+        <p class="text-slate-400 text-center mb-6">Wersja komputerowa (Plansza 3x2)</p>
+
+        <!-- Klawisz pełnego ekranu już na etapie konfiguracji -->
+        <button type="button" onclick="toggleFullScreen()" class="w-full mb-6 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold text-sm rounded-xl transition flex items-center justify-center gap-2">
+            <span>⛶ Tryb pełnoekranowy (Rozwiń na cały ekran)</span>
+        </button>
+
+        <div class="space-y-5 mb-8">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-300 mb-2">Czas na rundę (sekundy)</label>
+                    <input type="number" id="duel-time" value="30" min="10" max="120" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-indigo-500 font-bold text-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-300 mb-2">Liczba graczy</label>
+                    <input type="number" id="player-count" value="3" min="2" max="6" onchange="updatePlayerInputs()" onkeyup="updatePlayerInputs()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-indigo-500 font-bold text-lg">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-300 mb-2">Imiona graczy</label>
+                <div id="player-inputs-container" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <button onclick="startGame()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 font-black text-xl rounded-2xl shadow-lg transition transform active:scale-95">
+            ROZPOCZNIJ GRĘ
+        </button>
+    </div>
+
+    <!-- EKRAN 2: GŁÓWNA PLANSZA (TYLKO POLE) -->
+    <div id="game-screen" class="w-full max-w-5xl flex-col hidden my-auto items-center justify-center">
+        <div id="board-container" class="grid grid-cols-3 gap-6 w-full p-6 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl justify-center"></div>
+    </div>
+
+    <!-- MODAL WYBORU KATEGORII -->
+    <div id="category-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-40">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-8 shadow-2xl text-center">
+            <h3 class="text-xs uppercase tracking-widest text-indigo-400 font-black mb-2">Wybór tematu</h3>
+            <h2 class="text-2xl font-black mb-6">W jakiej kategorii chcecie grać?</h2>
+            <div class="grid grid-cols-1 gap-4 mb-6">
+                <button id="cat-btn-attacker" onclick="confirmCategoryChoice(attackerCat)" class="p-5 rounded-2xl border-2 border-indigo-500 bg-indigo-950/40 hover:bg-indigo-900/60 transition text-left">
+                    <span id="cat-label-attacker" class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Kategoria atakującego</span>
+                    <span id="cat-name-attacker" class="text-xl font-black block">---</span>
+                </button>
+                <button id="cat-btn-defender" onclick="confirmCategoryChoice(defenderCat)" class="p-5 rounded-2xl border-2 border-rose-500 bg-rose-950/40 hover:bg-rose-900/60 transition text-left">
+                    <span id="cat-label-defender" class="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Kategoria obrońcy</span>
+                    <span id="cat-name-defender" class="text-xl font-black block">---</span>
+                </button>
+            </div>
+            <button onclick="cancelCategorySelection()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-sm font-bold rounded-xl">Anuluj wybór</button>
+        </div>
+    </div>
+
+    <!-- EKRAN 3: POJEDYNEK -->
+    <div id="duel-screen" class="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl hidden my-auto flex flex-col items-center relative">
+        <div class="w-full flex justify-between items-center mb-6 border-b border-slate-800 pb-5">
+            <div id="box-timer-1" class="p-5 rounded-2xl border border-slate-700 text-center w-1/3 transition">
+                <span id="duel-name-1" class="block text-sm font-bold text-slate-400 truncate mb-1">Gracz 1</span>
+                <span id="duel-timer-1" class="text-5xl font-black">30</span>
+            </div>
+            <div class="text-center px-4">
+                <span class="text-xs uppercase tracking-widest text-indigo-400 font-black block mb-1">POJEDYNEK</span>
+                <span id="duel-category-title" class="text-xl font-extrabold text-slate-100">Kategoria</span>
+            </div>
+            <div id="box-timer-2" class="p-5 rounded-2xl border border-slate-700 text-center w-1/3 transition">
+                <span id="duel-name-2" class="block text-sm font-bold text-slate-400 truncate mb-1">Gracz 2</span>
+                <span id="duel-timer-2" class="text-5xl font-black">30</span>
+            </div>
+        </div>
+
+        <div class="relative w-full max-w-xl h-96 bg-white rounded-2xl border border-slate-800 overflow-hidden mb-6 flex items-center justify-center shadow-inner">
+            <img id="duel-photo" src="" alt="Zdjęcie" class="max-h-full max-w-full object-contain p-2 hidden">
+            <!-- NAKŁADKA STARTOWA PRZED RUNDĄ -->
+            <div id="start-round-overlay" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center">
+                <span class="text-xs uppercase tracking-widest text-indigo-400 font-bold mb-2">Gotowi do starcia?</span>
+                <h3 id="duel-intro-text" class="text-2xl font-black mb-6">Gracz 1 vs Gracz 2</h3>
+                <button onclick="beginCountdown()" class="px-10 py-4 bg-emerald-600 hover:bg-emerald-500 font-black text-2xl rounded-2xl shadow-xl transition transform active:scale-95">
+                    START
+                </button>
+            </div>
+        </div>
+
+        <p class="text-slate-400 text-sm mb-6 text-center font-medium">Patrz na zdjęcie, podaj odpowiedź ustnie. Prowadzący klika odpowiedni przycisk.</p>
+
+        <div class="grid grid-cols-2 gap-6 w-full max-w-xl">
+            <button id="btn-correct" onclick="handleCorrectAnswer()" disabled class="py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-lg rounded-2xl shadow-lg transition flex flex-col items-center">
+                <span>Poprawna (Kolejny odpowiada)</span>
+                <span class="text-xs font-normal opacity-90 mt-1">Zmiana gracza i kolejna fotka</span>
+            </button>
+            <button id="btn-pass" onclick="handlePass()" disabled class="py-4 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-bold text-lg rounded-2xl shadow-lg transition flex flex-col items-center">
+                <span>Pass / Błąd (-3 sek)</span>
+                <span class="text-xs font-normal opacity-90 mt-1">Kara -3s, ten sam odpowiada</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL KOŃCA RUNDY -->
+    <div id="round-end-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-8 shadow-2xl text-center">
+            <h2 class="text-3xl font-black mb-6 text-amber-400 tracking-wider">RUNDA ZAKOŃCZONA</h2>
+            <button onclick="returnToBoard()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 font-black text-lg rounded-2xl shadow-lg transition transform active:scale-95">
+                Wróć do planszy
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL ZWYCIĘSTWA CAŁEJ GRY -->
+    <div id="win-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-indigo-500/50 w-full max-w-lg rounded-3xl p-8 text-center shadow-2xl">
+            <h2 class="text-5xl font-black mb-3 bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">ZWYCIĘSTWO!</h2>
+            <p id="winner-announcement" class="text-xl text-slate-300 mb-8 font-semibold">Gracz wygrał całą planszę!</p>
+            <button onclick="closeWinModal()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 font-black text-lg rounded-2xl shadow-lg">
+                Wróć do planszy
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function toggleFullScreen() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) {
+                    document.documentElement.webkitRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        }
+
+        function generatePhotos(folderName, count) {
+            let items = [];
+            for (let i = 1; i <= count; i++) {
+                items.push({ img: `photos/${folderName}/${i}.png` });
+            }
+            return items;
+        }
+
+        const categoriesData = [
+            { name: "Samochody", items: generatePhotos("samochody", 45) },
+            { name: "Slawni Ludzie", items: generatePhotos("slawni_ludzie", 40) },
+            { name: "Rebusy", items: generatePhotos("rebus", 32) },
+            { name: "Logistyka", items: generatePhotos("logistyka", 31) },
+            { name: "Sale Lekcyjne", items: generatePhotos("sale_lekcyjne", 31) },
+            { name: "Oznakowanie W Logistyce", items: generatePhotos("oznakowanie_w_logistyce", 33) }
+        ];
+
+        const playerColors = [
+            "bg-blue-600 border-blue-400 text-white",
+            "bg-rose-600 border-rose-400 text-white",
+            "bg-amber-600 border-amber-400 text-white",
+            "bg-emerald-600 border-emerald-400 text-white",
+            "bg-purple-600 border-purple-400 text-white",
+            "bg-cyan-600 border-cyan-400 text-white"
+        ];
+
+        const gridSize = 3;
+        const totalCells = 6;
+        
+        let players = [];
+        let board = [];
+        let selectedCellIndex = null;
+        let defendingCellIndex = null;
+
+        let attackerCat = null;
+        let defenderCat = null;
+        let chosenCategory = null;
+
+        let duelTimeSetting = 30;
+        let time1 = 30;
+        let time2 = 30;
+        let activeClock = 1;
+        let timerInterval = null;
+        let currentCategoryPhotos = [];
+        let currentPhotoIndex = 0;
+
+        const defaultNames = ["Kacper", "Ola", "Bartek", "Zosia", "Tomek", "Kuba"];
+
+        function updatePlayerInputs() {
+            const countInput = document.getElementById("player-count");
+            let count = parseInt(countInput.value) || 3;
+            if (count < 2) count = 2;
+            if (count > 6) count = 6;
+            countInput.value = count;
+
+            const container = document.getElementById("player-inputs-container");
+            const existingInputs = container.querySelectorAll("input");
+            const savedNames = Array.from(existingInputs).map(inp => inp.value);
+
+            container.innerHTML = "";
+            for (let i = 0; i < count; i++) {
+                const nameVal = savedNames[i] !== undefined ? savedNames[i] : (defaultNames[i] || `Gracz ${i+1}`);
+                const div = document.createElement("div");
+                div.className = "flex items-center space-x-3";
+                div.innerHTML = `
+                    <span class="text-xs font-bold text-slate-400 w-16">Gracz ${i+1}:</span>
+                    <input type="text" id="player-name-${i}" value="${nameVal}" onfocus="toggleFullScreen()" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-medium">
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        window.onload = function() {
+            updatePlayerInputs();
+        };
+
+        function startGame() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) {
+                    document.documentElement.webkitRequestFullscreen();
+                }
+            }
+
+            duelTimeSetting = parseInt(document.getElementById("duel-time").value);
+            const count = parseInt(document.getElementById("player-count").value);
+            
+            players = [];
+            for (let i = 0; i < count; i++) {
+                const nameInput = document.getElementById(`player-name-${i}`);
+                const nameVal = nameInput && nameInput.value.trim() !== "" ? nameInput.value.trim() : `Gracz ${i+1}`;
+                players.push({
+                    id: i,
+                    name: nameVal,
+                    color: playerColors[i % playerColors.length]
+                });
+            }
+
+            const shuffledCats = [...categoriesData].sort(() => Math.random() - 0.5);
+            board = [];
+            for (let i = 0; i < totalCells; i++) {
+                board.push({
+                    id: i,
+                    owner: i % players.length,
+                    category: shuffledCats[i % shuffledCats.length]
+                });
+            }
+
+            document.getElementById("setup-screen").classList.add("hidden");
+            document.getElementById("game-screen").classList.remove("hidden");
+            document.getElementById("game-screen").classList.add("flex");
+
+            renderBoard();
+        }
+
+        function renderBoard() {
+            const container = document.getElementById("board-container");
+            container.innerHTML = "";
+
+            board.forEach((cell, index) => {
+                const ownerObj = players[cell.owner] || { name: "Brak", color: "bg-slate-800" };
+                const div = document.createElement("div");
+                div.className = `aspect-[4/3] rounded-2xl p-5 border-2 flex flex-col justify-between cursor-pointer transition transform hover:scale-[1.02] shadow-xl ${ownerObj.color}`;
+                
+                if (selectedCellIndex === index) {
+                    div.classList.add("ring-4", "ring-white", "scale-105");
+                }
+
+                div.innerHTML = `
+                    <div class="text-xs font-bold opacity-80 uppercase tracking-widest">Pole #${index + 1}</div>
+                    <div class="text-center my-auto">
+                        <span class="block text-lg font-black tracking-tight">${cell.category.name}</span>
+                    </div>
+                    <div class="text-sm font-black uppercase tracking-wider text-right opacity-90">${ownerObj.name}</div>
+                `;
+
+                div.onclick = () => handleCellClick(index);
+                container.appendChild(div);
+            });
+        }
+
+        function handleCellClick(index) {
+            if (selectedCellIndex === null) {
+                selectedCellIndex = index;
+                renderBoard();
+            } else {
+                if (!isAdjacent(selectedCellIndex, index, gridSize)) {
+                    alert("Możesz atakować tylko sąsiadujące pola (góra, dół, lewo, prawo)!");
+                    return;
+                }
+                if (board[selectedCellIndex].owner === board[index].owner) {
+                    alert("Nie możesz atakować pola tego samego gracza!");
+                    return;
+                }
+
+                defendingCellIndex = index;
+                openCategorySelectionModal();
+            }
+        }
+
+        function isAdjacent(idx1, idx2, size) {
+            const r1 = Math.floor(idx1 / size);
+            const c1 = idx1 % size;
+            const r2 = Math.floor(idx2 / size);
+            const c2 = idx2 % size;
+            return (Math.abs(r1 - r2) + Math.abs(c1 - c2) === 1);
+        }
+
+        function openCategorySelectionModal() {
+            attackerCat = board[selectedCellIndex].category;
+            defenderCat = board[defendingCellIndex].category;
+
+            const attacker = players[board[selectedCellIndex].owner];
+            const defender = players[board[defendingCellIndex].owner];
+
+            document.getElementById("cat-label-attacker").innerText = `Kategoria gracza: ${attacker.name}`;
+            document.getElementById("cat-name-attacker").innerText = attackerCat.name;
+
+            document.getElementById("cat-label-defender").innerText = `Kategoria gracza: ${defender.name}`;
+            document.getElementById("cat-name-defender").innerText = defenderCat.name;
+
+            document.getElementById("category-modal").classList.remove("hidden");
+            document.getElementById("category-modal").classList.add("flex");
+        }
+
+        function cancelCategorySelection() {
+            document.getElementById("category-modal").classList.add("hidden");
+            document.getElementById("category-modal").classList.remove("flex");
+            selectedCellIndex = null;
+            defendingCellIndex = null;
+            renderBoard();
+        }
+
+        function confirmCategoryChoice(cat) {
+            chosenCategory = cat;
+            document.getElementById("category-modal").classList.add("hidden");
+            document.getElementById("category-modal").classList.remove("flex");
+            prepareDuel();
+        }
+
+        function prepareDuel() {
+            document.getElementById("game-screen").classList.add("hidden");
+            document.getElementById("game-screen").classList.remove("flex");
+            document.getElementById("duel-screen").classList.remove("hidden");
+            document.getElementById("duel-screen").classList.add("flex");
+
+            const attacker = players[board[selectedCellIndex].owner];
+            const defender = players[board[defendingCellIndex].owner];
+
+            document.getElementById("duel-name-1").innerText = attacker.name;
+            document.getElementById("duel-name-2").innerText = defender.name;
+            document.getElementById("duel-category-title").innerText = chosenCategory.name;
+            document.getElementById("duel-intro-text").innerText = `${attacker.name} vs ${defender.name}`;
+
+            currentCategoryPhotos = [...chosenCategory.items].sort(() => Math.random() - 0.5);
+            currentPhotoIndex = 0;
+
+            time1 = duelTimeSetting;
+            time2 = duelTimeSetting;
+            activeClock = 1; // Начинает атакующий (Игрок 1)
+
+            updateTimersDisplay();
+
+            document.getElementById("duel-photo").classList.add("hidden");
+            document.getElementById("start-round-overlay").classList.remove("hidden");
+            document.getElementById("btn-correct").disabled = true;
+            document.getElementById("btn-pass").disabled = true;
+        }
+
+        function beginCountdown() {
+            document.getElementById("start-round-overlay").classList.add("hidden");
+            document.getElementById("duel-photo").classList.remove("hidden");
+            document.getElementById("btn-correct").disabled = false;
+            document.getElementById("btn-pass").disabled = false;
+
+            loadNextPhoto();
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateClockTick, 1000);
+        }
+
+        function loadNextPhoto() {
+            if (currentPhotoIndex >= currentCategoryPhotos.length) {
+                currentCategoryPhotos = [...chosenCategory.items].sort(() => Math.random() - 0.5);
+                currentPhotoIndex = 0;
+            }
+            const photoObj = currentCategoryPhotos[currentPhotoIndex];
+            document.getElementById("duel-photo").src = photoObj.img;
+            currentPhotoIndex++;
+        }
+
+        function updateTimersDisplay() {
+            document.getElementById("duel-timer-1").innerText = time1;
+            document.getElementById("duel-timer-2").innerText = time2;
+
+            const box1 = document.getElementById("box-timer-1");
+            const box2 = document.getElementById("box-timer-2");
+
+            if (activeClock === 1) {
+                box1.className = "p-5 rounded-2xl border-2 border-indigo-500 bg-indigo-950/50 text-center w-1/3 shadow-xl scale-105";
+                box2.className = "p-5 rounded-2xl border border-slate-700 bg-slate-950 text-center w-1/3 opacity-50";
+            } else {
+                box2.className = "p-5 rounded-2xl border-2 border-indigo-500 bg-indigo-950/50 text-center w-1/3 shadow-xl scale-105";
+                box1.className = "p-5 rounded-2xl border border-slate-700 bg-slate-950 text-center w-1/3 opacity-50";
+            }
+        }
+
+        function updateClockTick() {
+            if (activeClock === 1) {
+                time1--;
+                if (time1 <= 0) { time1 = 0; endDuel(2); }
+            } else {
+                time2--;
+                if (time2 <= 0) { time2 = 0; endDuel(1); }
+            }
+            updateTimersDisplay();
+        }
+
+        // ПРАВИЛЬНЫЙ ОТВЕТ: Засчитывается, картинка меняется, ход переходит к СОПЕРНИКУ
+        function handleCorrectAnswer() {
+            activeClock = activeClock === 1 ? 2 : 1;
+            loadNextPhoto();
+            updateTimersDisplay();
+        }
+
+        // ОШИБКА / ПАСС: Штраф -3 секунды, ТЕКУЩИЙ игрок отвечает дальше на следующую картинку
+        function handlePass() {
+            if (activeClock === 1) {
+                time1 -= 3;
+                if (time1 < 0) time1 = 0;
+            } else {
+                time2 -= 3;
+                if (time2 < 0) time2 = 0;
+            }
+            
+            updateTimersDisplay();
+
+            if (activeClock === 1 && time1 <= 0) {
+                endDuel(2);
+                return;
+            } else if (activeClock === 2 && time2 <= 0) {
+                endDuel(1);
+                return;
+            }
+
+            loadNextPhoto();
+        }
+
+        function endDuel(winnerSide) {
+            clearInterval(timerInterval);
+            document.getElementById("btn-correct").disabled = true;
+            document.getElementById("btn-pass").disabled = true;
+
+            let winnerPlayerIndex;
+            let loserPlayerIndex;
+
+            if (winnerSide === 1) {
+                winnerPlayerIndex = board[selectedCellIndex].owner;
+                loserPlayerIndex = board[defendingCellIndex].owner;
+                board[defendingCellIndex].owner = winnerPlayerIndex;
+            } else {
+                winnerPlayerIndex = board[defendingCellIndex].owner;
+                loserPlayerIndex = board[selectedCellIndex].owner;
+            }
+
+            board.forEach(cell => {
+                if (cell.owner === loserPlayerIndex) {
+                    cell.owner = winnerPlayerIndex;
+                }
+            });
+
+            document.getElementById("round-end-modal").classList.remove("hidden");
+            document.getElementById("round-end-modal").classList.add("flex");
+        }
+
+        function returnToBoard() {
+            document.getElementById("round-end-modal").classList.add("hidden");
+            document.getElementById("round-end-modal").classList.remove("flex");
+
+            selectedCellIndex = null;
+            defendingCellIndex = null;
+
+            document.getElementById("duel-screen").classList.add("hidden");
+            document.getElementById("duel-screen").classList.remove("flex");
+            document.getElementById("game-screen").classList.remove("hidden");
+            document.getElementById("game-screen").classList.add("flex");
+
+            renderBoard();
+            checkWinCondition();
+        }
+
+        function checkWinCondition() {
+            const firstOwner = board[0].owner;
+            const allWon = board.every(cell => cell.owner === firstOwner);
+            if (allWon) {
+                const winner = players[firstOwner];
+                document.getElementById("winner-announcement").innerText = `Gracz ${winner.name} przejął wszystkie pola i wygrał całą grę!`;
+                document.getElementById("win-modal").classList.remove("hidden");
+                document.getElementById("win-modal").classList.add("flex");
+            }
+        }
+
+        function closeWinModal() {
+            document.getElementById("win-modal").classList.add("hidden");
+            document.getElementById("win-modal").classList.remove("flex");
+        }
+    </script>
+</body>
+</html>
